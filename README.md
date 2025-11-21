@@ -37,13 +37,13 @@ ppt已驻准备好;
 controller 向数字人接口websocket的消息包括：
 ## 1. 播放列表
 新的播放列表下发后;冲掉之前的播放列表,并立即以新的播放列表播放;下发的playlist列表为空时,清除播放列表(起到停止的作用);
-逻辑：用新的播放列表。
+逻辑：用新的播放列表替换以前的列表。
 ```JSON
 {"tasks": "playlist",
   "playlist": [
       {"video": "../assets/videos/video1.webm", "loop": 1, "left": 1200, "top": 700, "width": 100, "height": 300}, //播放1次
        {"image": "../assets/videos/video2.jpeg", "loop": 3}, //持续3秒
-       {"video": "../assets/videos/video1.webm", "loop": 999}  //无限循环
+       {"video": "../assets/videos/video1.webm", "loop": -1}  //无限循环
         ...
         ]
 }
