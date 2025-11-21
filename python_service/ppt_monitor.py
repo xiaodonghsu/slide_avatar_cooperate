@@ -154,11 +154,11 @@ async def broadcast_slide_change():
                 if new_slide_index != -1:
                     print(time.strftime("%H-%M-%S"), f"Status: {present_count}, Current edit slide: {edit_index}, Current Present slide: {present_index}")
                     message = json.dumps({
-                        "workmode": work_mode["mode"],
-                        "command": "play",
-                        "type": "video",
-                        "uri": f"../assets/videos/video{new_slide_index}.webm",
-                        "loop": work_mode.get("loop", False)
+                        "tasks": "playlist",
+                        "playlist": [
+                            {"video": f"../assets/videos/video{new_slide_index}.webm", "loop": 1},
+                            {"video": "../assets/videos/idle.webm", "loop": 999}
+                        ]
                     })
                     await handler.send_to_clients(message)
             await asyncio.sleep(0.5)
