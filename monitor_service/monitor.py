@@ -1,23 +1,44 @@
 import win32com.client
 import asyncio
 import json
+import os
 import websockets
 import time
 
-WORK_MODE_FILE = "work-mode.json"
-WS_PORT = 8765
+class Config():
+    def __init__(self, work_mode="manual", server_host="localhost", websocket_port=8765):
+        '''
+        work_mode: 工作模式, manual 手动, collaboration 协同, auto 自动
+        server_host: WebSocket 服务器监听地址
+        websocket_port: WebSocket 服务器监听端口
+        '''
+        self.__CONFIG_FILE = "config.json"
+        if not os.path.exists(self.__CONFIG_FILE):
+            raise FileNotFoundError(f"Configuration file '{self.__CONFIG_FILE}' not found.")
+        self.config = {}
+        self.__last_update_time = None
+        self.update()
+        self.isUpdated = False
 
-def get_work_mode():
-    '''
-    从文件获取当前的工作模式，如果不存在则默认为手动模式
-    '''
-    try:
-        with open(WORK_MODE_FILE, "r") as f:
-            return json.load(f)
-    except:
-        with open(WORK_MODE_FILE, "w") as f:
-            json.dump({"mode": "manual", "loop": False}, f)
-        return {"mode": "manual", "loop": False}
+    def update(self):
+        self.isUpdated = False
+        if not self.__last_update_time == os.path.getmtime(self.__CONFIG_FILE):
+            print("Configuration file updated, reloading...")
+            with open(self.__CONFIG_FILE, "r") as f:
+                self.config = json.load(f)
+            self.__last_update_time = os.path.getmtime(self.__CONFIG_FILE)
+            self.isUpdated = True
+        if self.isUpdated:
+            print("Current Configuration:", self.config)
+            if self.config["work_mode"] == "manual":
+                print('讲解员模式, 不检测ppt状态')
+            elif self.config["work_mode"] == "collaboration":
+                print("协作模式, 讲解员决定内容播放")
+            elif self.config["work_mode"] == "auto":
+                print("自动模式, ppt 启动后自动播放")
+            else:
+                print("未知模式:", self.config["work_mode"], "按讲解员模式处理")
+                self.config["work_mode"] = "manual"
 
 class PowerPointMonitor():
     def __init__(self):
@@ -120,24 +141,71 @@ class PowerPointMonitor():
             return present_count, edit_index, present_index
 
 async def broadcast_slide_change():
+
+    # 首次启动使用当前的配置作为基础配置
+    print("读取配置文件...")
+    cfg = Config()
+    previous_config = cfg.config.copy()
+    previous_edit_slide_index = -1
+    previous_present_slide_index = -1
+
+    # 初始化 PowerPoint 监控器
     ppt_monitor = PowerPointMonitor()
     ppt_name = ppt_monitor.get_presentation_name()
-    if not ppt_name  is None:
-        print("Current PPT", ppt_name)
-    else:
+    if ppt_name is None:
         print("No PPT opened")
+    else:
+        print("Current PPT", ppt_name)
 
-    previous_edit_slide_index = -1
-    previous_present_slide_index = None
-
-    async with websockets.serve(handler.handler, "localhost", WS_PORT):
-        print(f"WebSocket server started at ws://localhost:{WS_PORT}")
+    # 启动 WebSocket 服务器
+    async with websockets.serve(handler.handler, cfg.config["server_host"], cfg.config["websocket_port"]):
+        print(f'WebSocket server started at ws://{cfg.config["server_host"]}:{cfg.config["websocket_port"]}')
         while True:
-            work_mode = get_work_mode()
-            # print(time.strftime("%H:%M:%S"), f"{work_mode=}")
-            if work_mode["mode"] == "manual":
+            # 检查配置文件更新
+            cfg.update()
+            if not cfg.isUpdated:
+                await asyncio.sleep(0.5)
+                continue
+
+            # 更新后的配置处理检查avatar_status变化
+            if previous_config["avatar_status"] != cfg.config["avatar_status"]:
+                message = json.dumps({
+                        "tasks": cfg.config["avatar_status"]
+                    })
+                await handler.send_to_clients(message)
+                previous_config["avatar_status"] = cfg.config["avatar_status"]
+
+            # 手动模式下不监测 PPT 状态
+            if cfg.config["work_mode"] == "manual":
+                # 如果之前不是 manual 模式，则发送停止播放的消息
+                if previous_config["work_mode"] != cfg.config["work_mode"]:
+                    print(time.strftime("%H-%M-%S"), f'Switched to {cfg.config["work_mode"]} mode.')
+                    # 发送空的播放列表以停止播放
+                    message = json.dumps({
+                        "tasks": "playlist",
+                        "playlist": []
+                    })
+                    await handler.send_to_clients(message)
+                    previous_config = cfg.config.copy()
                 await asyncio.sleep(1)
                 continue
+
+            # # 协作模式
+            # if cfg.config["work_mode"] == "collaboration":
+            #     if previous_config["work_mode"] != cfg.config["work_mode"]:
+            #         print(time.strftime("%H-%M-%S"), "Switched to collaboration work_mode.")
+            #         # 发送空的播放列表以停止播放
+            #         message = json.dumps({
+            #             "tasks": "playlist",
+            #             "playlist": []
+            #         })
+            #         await handler.send_to_clients(message)
+
+            
+            # if cfg.config["work_mode"] == "auto":
+            #     # present_count, edit_index, present_index = ppt_monitor.get_current_status()
+            #     # print(f"{present_count}, {edit_index}, {present_index}")
+            #     pass
 
             present_count, edit_index, present_index = ppt_monitor.get_current_status()
             # print(f"{present_count}, {edit_index}, {present_index}")
@@ -157,7 +225,7 @@ async def broadcast_slide_change():
                         "tasks": "playlist",
                         "playlist": [
                             {"video": f"../assets/videos/video{new_slide_index}.webm", "loop": 1},
-                            {"video": "../assets/videos/idle.webm", "loop": 999}
+                            {"video": "../assets/videos/idle.webm", "loop": -1}
                         ]
                     })
                     await handler.send_to_clients(message)

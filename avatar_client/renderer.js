@@ -251,7 +251,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function parseControllerMessage(message) {
         try {
-            console.log('Received from Python:', message);
+            console.log('Received from Monitor:', message);
 
             // If it's already an object (e.g. json parsed by the WS layer), return it
             if (message && typeof message === 'object' && !((typeof Buffer !== 'undefined') && Buffer.isBuffer(message)) && !(message instanceof ArrayBuffer) && !(message instanceof Uint8Array)) {
