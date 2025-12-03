@@ -289,17 +289,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const t = msg.tasks;
         if (t === 'playlist') {
-            // replace playlist immediately
+            console.info('New playlist.');
             handlePlaylistMessage(msg.playlist || []);
             return;
         }
 
         if (t === 'pause') {
+            console.info('Pausing playback.');
             pausePlayback();
             return;
         }
 
         if (t === 'play') {
+            console.info('Resuming playback.');
             resumePlayback();
             return;
         }

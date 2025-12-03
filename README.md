@@ -58,3 +58,17 @@ controller 向数字人接口websocket的消息包括：
 ```JSON
 {"tasks": "play"}
 ```
+
+## 使用方法
+
+### 1. 启动PPT监控服务
+
+```bash
+cd monitor_service && python monitor.py
+```
+
+### 2. 启动数字人播放服务
+
+```bash
+cd avatar_client && npm start
+```
