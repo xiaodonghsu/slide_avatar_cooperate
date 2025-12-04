@@ -293,7 +293,14 @@ class handler:
     async def send_to_clients(cls, message):
         print(f"Broadcasting message to {len(cls.clients)} clients: {message}")
         if cls.clients:
-            await asyncio.wait([client.send(message) for client in cls.clients])
+            # 原版
+            # await asyncio.wait([client.send(message) for client in cls.clients])
+            # 某些版本下会出现
+            # Passing coroutines coroutines is forbidden use tasks explicitly
+            # 的提示, 需要先转换为任务
+            tasks = [asyncio.create_task(client.send(message)) for client in cls.clients]
+            await asyncio.wait(tasks)
+
 
 if __name__ == "__main__":
     asyncio.run(broadcast_slide_change())
