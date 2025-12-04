@@ -1,23 +1,29 @@
 {
-    "slide_name": "大模型-模型能力介绍",
-    "idle": "videos/idle.webm",
-    "1": "videos/video1.webm",
-    "3": "videos/video2.webm",
-    "4": "videos/video1.webm",
-    "5": "videos/video2.webm",
-    "6": "videos/video1.webm",
-    "7": "videos/video2.webm",
-    "8": "videos/video1.webm",
-    "9": "videos/video2.webm",
-    "10": "videos/video1.webm",
-    "11": "videos/video2.webm",
-    "12": "videos/video1.webm",
-    "13": "videos/video2.webm",
-    "14": "videos/video1.webm",
-    "15": "videos/video2.webm",
-    "16": "videos/video1.webm",
-    "17": "videos/video2.webm",
-    "18": "videos/video1.webm",
-    "19": "videos/video2.webm",
-    "20": "videos/video1.webm"
+    "slide_videos": [
+        {
+            "name": "demo-大模型介绍.pptx",
+            "videos:": {
+                "idle": "videos/demo-video.webm",
+                "1": "videos/demo-10-Summery.webm",
+                "3": "videos/demo-20-Entrance.webm",
+                "4": "videos/demo-10-Summery.webm",
+                "5": "videos/demo-20-Entrance.webm",
+                "6": "videos/demo-10-Summery.webm",
+                "7": "videos/demo-20-Entrance.webm",
+                "8": "videos/demo-10-Summery.webm",
+                "9": "videos/demo-20-Entrance.webm",
+                "10": "videos/demo-10-Summery.webm",
+                "11": "videos/demo-20-Entrance.webm",
+                "12": "videos/demo-10-Summery.webm",
+                "13": "videos/demo-20-Entrance.webm",
+                "14": "videos/demo-10-Summery.webm",
+                "15": "videos/demo-20-Entrance.webm",
+                "16": "videos/demo-10-Summery.webm",
+                "17": "videos/demo-20-Entrance.webm",
+                "18": "videos/demo-10-Summery.webm",
+                "19": "videos/demo-20-Entrance.webm",
+                "20": "videos/demo-10-Summery.webm"
+            }
+        }
+    ]
 }

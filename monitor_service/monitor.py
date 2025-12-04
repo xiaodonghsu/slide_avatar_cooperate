@@ -48,6 +48,7 @@ class PowerPointMonitor():
         self.connect_powerpoint()
         self.slide_show_active = False
         self.presentation_name = None
+        self.slide_video_list = None
 
     def connect_powerpoint(self):
         for app_name in self._ppt_app_list:
@@ -146,6 +147,28 @@ class PowerPointMonitor():
             except:
                 pass
             return present_count, edit_index, present_index
+
+    def update_slide_video_list(self, presentation_name):
+        '''
+        获取当前幻灯片中的视频列表
+        '''
+        with open("assets/slide_video.json", "r", encoding='utf-8') as f:
+            j = json.load(f)
+            if  presentation_name in j["slide_videos"]:
+                self.slide_video_list = j["slide_videos"][presentation_name]
+            else:
+                self.slide_video_list = None
+
+    def get_slide_audio_list(self):
+        '''
+        获取当前幻灯片中的音频列表
+        '''
+        audio_list = []
+        if self.get_presentations_count()>0:
+            try:
+                presentation = self.ppt_app.ActivePresentation
+                slides = presentation.Slides
+                for i in range(slides.
 
 async def broadcast_slide_change():
 
