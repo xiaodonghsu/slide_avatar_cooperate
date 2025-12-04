@@ -31,7 +31,7 @@ class Config():
         if self.isUpdated:
             print("Current Configuration:", self.config)
             if self.config["work_mode"] == "manual":
-                print('讲解员模式, 不检测ppt状态')
+                print('讲解员模式, 检测ppt状态，不自动播放')
             elif self.config["work_mode"] == "collaboration":
                 print("协作模式, 讲解员决定内容播放")
             elif self.config["work_mode"] == "auto":
@@ -42,17 +42,24 @@ class Config():
 
 class PowerPointMonitor():
     def __init__(self):
+        self._ppt_app_list = ["PowerPoint.Application", "Kwpp.Application"]
+        self.ppt_app_name = None
         self.ppt_app = None
         self.connect_powerpoint()
         self.slide_show_active = False
         self.presentation_name = None
 
     def connect_powerpoint(self):
-        try:
-            self.ppt_app = win32com.client.GetActiveObject("PowerPoint.Application")
-        except Exception as e:
-            # print(e)
-            self.ppt_app = None
+        for app_name in self._ppt_app_list:
+            try:
+                self.ppt_app = win32com.client.GetActiveObject(app_name)
+                if self.ppt_app:
+                    self.ppt_app_name = app_name
+                    print(f"连接 ppt app {app_name} 成功!")
+                    break
+            except Exception as e:
+                # print(e)
+                self.ppt_app = None
 
     def get_presentation_name(self):
         '''
@@ -152,43 +159,82 @@ async def broadcast_slide_change():
     # 初始化 PowerPoint 监控器
     ppt_monitor = PowerPointMonitor()
     ppt_name = ppt_monitor.get_presentation_name()
+    present_count, previous_edit_slide_index, previous_present_slide_index = ppt_monitor.get_current_status()
     if ppt_name is None:
         print("No PPT opened")
     else:
-        print("Current PPT", ppt_name)
+        print("PPT应用名称:", ppt_monitor.ppt_app_name, 
+              "PPT名称:", ppt_name) 
+        print("当前编辑页面:", previous_edit_slide_index,
+              "当前播放页面:", previous_present_slide_index,
+              "总页面数:", present_count)
 
     # 启动 WebSocket 服务器
     async with websockets.serve(handler.handler, cfg.config["server_host"], cfg.config["websocket_port"]):
         print(f'WebSocket server started at ws://{cfg.config["server_host"]}:{cfg.config["websocket_port"]}')
         while True:
-            # 检查配置文件更新
+            # 监测配置文件更新
+            # 如果文件更新, 需要分析具体的变化:
+            # 从 auto 或 collaboration 切换到 manual, 需要发送停止播放的消息
             cfg.update()
-            if not cfg.isUpdated:
-                await asyncio.sleep(0.5)
-                continue
+            if cfg.isUpdated:
+                if cfg.config["work_mode"] == "manual":
+                    print("Switched to manual mode.") 
+                    if previous_config["work_mode"] != cfg.config["work_mode"]:
+                        print(time.strftime("%H-%M-%S"), f'Switched to {cfg.config["work_mode"]} mode.')
+                        # 发送空的播放列表以停止播放
+                        message = json.dumps({
+                            "tasks": "playlist",
+                            "playlist": []
+                        })
+                        await handler.send_to_clients(message)
+                        pass
 
-            # 更新后的配置处理检查avatar_status变化
-            if previous_config["avatar_status"] != cfg.config["avatar_status"]:
-                message = json.dumps({
-                        "tasks": cfg.config["avatar_status"]
-                    })
-                await handler.send_to_clients(message)
-                previous_config["avatar_status"] = cfg.config["avatar_status"]
-
-            # 手动模式下不监测 PPT 状态
-            if cfg.config["work_mode"] == "manual":
-                # 如果之前不是 manual 模式，则发送停止播放的消息
-                if previous_config["work_mode"] != cfg.config["work_mode"]:
-                    print(time.strftime("%H-%M-%S"), f'Switched to {cfg.config["work_mode"]} mode.')
-                    # 发送空的播放列表以停止播放
+                # 更新后的配置处理检查avatar_status变化
+                if previous_config["avatar_status"] != cfg.config["avatar_status"]:
+                    print("发送任务")
+                    message = json.dumps({
+                            "tasks": cfg.config["avatar_status"]
+                        })
+                    await handler.send_to_clients(message)
+            # 更新 previous_config
+            previous_config = cfg.config.copy()
+ 
+            # 监测 PPT 状态变化
+            present_count, edit_index, present_index = ppt_monitor.get_current_status()
+            if previous_present_slide_index != present_index or previous_edit_slide_index != edit_index:
+                print(f"页面总数: {present_count}, 编辑页面: {edit_index}, 播放页面: {present_index}")
+            
+            if present_count > 0:
+                new_slide_index = -1
+                if (present_index != previous_present_slide_index):
+                    new_slide_index = present_index
+                else:
+                    if (edit_index != previous_edit_slide_index):
+                        new_slide_index = edit_index
+                # print(new_slide_index)
+                if new_slide_index != -1:
+                    print(time.strftime("%H-%M-%S"), f"Status: {present_count}, Current edit slide: {edit_index}, Current Present slide: {present_index}")
                     message = json.dumps({
                         "tasks": "playlist",
-                        "playlist": []
+                        "playlist": [
+                            {"video": f"../assets/videos/video{new_slide_index}.webm", "loop": 1},
+                            {"video": "../assets/videos/idle.webm", "loop": -1}
+                        ]
                     })
                     await handler.send_to_clients(message)
-                    previous_config = cfg.config.copy()
-                await asyncio.sleep(1)
-                continue
+            await asyncio.sleep(0.5)
+
+            previous_present_slide_index = present_index
+            previous_edit_slide_index = edit_index
+
+
+            # 手动模式下不监测 PPT 状态
+            # if cfg.config["work_mode"] == "manual":
+            #     # 如果之前不是 manual 模式，则发送停止播放的消息
+            #     previous_config = cfg.config.copy()
+            #     await asyncio.sleep(1)
+            #     continue
 
             # # 协作模式
             # if cfg.config["work_mode"] == "collaboration":
@@ -207,29 +253,6 @@ async def broadcast_slide_change():
             #     # print(f"{present_count}, {edit_index}, {present_index}")
             #     pass
 
-            present_count, edit_index, present_index = ppt_monitor.get_current_status()
-            # print(f"{present_count}, {edit_index}, {present_index}")
-            if present_count > 0:
-                new_slide_index = -1
-                if (present_index != previous_present_slide_index):
-                    new_slide_index = present_index
-                else:
-                    if (edit_index != previous_edit_slide_index):
-                        new_slide_index = edit_index
-                previous_present_slide_index = present_index
-                previous_edit_slide_index = edit_index
-                # print(new_slide_index)
-                if new_slide_index != -1:
-                    print(time.strftime("%H-%M-%S"), f"Status: {present_count}, Current edit slide: {edit_index}, Current Present slide: {present_index}")
-                    message = json.dumps({
-                        "tasks": "playlist",
-                        "playlist": [
-                            {"video": f"../assets/videos/video{new_slide_index}.webm", "loop": 1},
-                            {"video": "../assets/videos/idle.webm", "loop": -1}
-                        ]
-                    })
-                    await handler.send_to_clients(message)
-            await asyncio.sleep(0.5)
 
 # 管理所有连接的客户端
 class handler:
