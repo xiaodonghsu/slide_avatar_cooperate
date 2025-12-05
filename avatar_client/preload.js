@@ -1,5 +1,27 @@
 const { contextBridge } = require("electron");
 
+// 尝试加载 electron-log，若缺失则回退到 console 实现，防止 preload 加载失败
+let _elog = null;
+try {
+    _elog = require('electron-log');
+} catch (e) {
+    // fallback: minimal shim that writes to console
+    _elog = {
+        info: (...args) => console.log(...args),
+        warn: (...args) => console.warn(...args),
+        error: (...args) => console.error(...args),
+        debug: (...args) => console.debug(...args)
+    };
+}
+
+// 将 electron-log 的简单接口暴露给渲染进程
+contextBridge.exposeInMainWorld('electronLog', {
+    info: (...args) => _elog.info(...args),
+    warn: (...args) => _elog.warn(...args),
+    error: (...args) => _elog.error(...args),
+    debug: (...args) => _elog.debug(...args)
+});
+
 // 在 preload 中管理原生 WebSocket，避免将原生对象跨 contextIsolation 返回
 contextBridge.exposeInMainWorld("pptWS", {
     connect(url, onMessage) {

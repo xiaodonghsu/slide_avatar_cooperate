@@ -9,9 +9,9 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 # Logger setup: write logs to project root `monitor.log`
-if not os.path.exists("log"):
+if not os.path.exists("../log"):
     os.mkdir("log")
-LOG_FILE = os.path.join("log", "monitor.log")
+LOG_FILE = os.path.join("../log", "monitor.log")
 logger = logging.getLogger("monitor_service")
 logger.setLevel(logging.DEBUG)
 if not logger.handlers:

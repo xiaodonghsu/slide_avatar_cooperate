@@ -3,4 +3,5 @@ monitor_service/__pycache__/
 monitor_service/log/
 avatar_client/node_modules/
 avatar_client/dist/
+log/
 config.json
