@@ -1,3 +1,4 @@
+assets/videos/*.*
 monitor_service/__pycache__/
 monitor_service/log/
 avatar_client/node_modules/
