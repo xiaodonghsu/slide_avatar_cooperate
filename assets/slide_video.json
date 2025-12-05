@@ -2,27 +2,28 @@
     "slide_videos": [
         {
             "name": "demo-大模型介绍.pptx",
-            "videos:": {
-                "idle": "videos/demo-video.webm",
-                "1": "videos/demo-10-Summery.webm",
-                "3": "videos/demo-20-Entrance.webm",
-                "4": "videos/demo-10-Summery.webm",
-                "5": "videos/demo-20-Entrance.webm",
-                "6": "videos/demo-10-Summery.webm",
-                "7": "videos/demo-20-Entrance.webm",
-                "8": "videos/demo-10-Summery.webm",
-                "9": "videos/demo-20-Entrance.webm",
-                "10": "videos/demo-10-Summery.webm",
-                "11": "videos/demo-20-Entrance.webm",
-                "12": "videos/demo-10-Summery.webm",
-                "13": "videos/demo-20-Entrance.webm",
-                "14": "videos/demo-10-Summery.webm",
-                "15": "videos/demo-20-Entrance.webm",
-                "16": "videos/demo-10-Summery.webm",
-                "17": "videos/demo-20-Entrance.webm",
-                "18": "videos/demo-10-Summery.webm",
-                "19": "videos/demo-20-Entrance.webm",
-                "20": "videos/demo-10-Summery.webm"
+            "videos": {
+                "idle": "videos/demo-idle.webm",
+                "slide-1": "videos/demo-10-Summery.webm",
+                "slide-2": "videos/demo-10-Summery.webm",
+                "slide-3": "videos/demo-20-Entrance.webm",
+                "slide-4": "videos/demo-10-Summery.webm",
+                "slide-5": "videos/demo-20-Entrance.webm",
+                "slide-6": "videos/demo-10-Summery.webm",
+                "slide-7": "videos/demo-20-Entrance.webm",
+                "slide-8": "videos/demo-10-Summery.webm",
+                "slide-9": "videos/demo-20-Entrance.webm",
+                "slide-10": "videos/demo-10-Summery.webm",
+                "slide-11": "videos/demo-20-Entrance.webm",
+                "slide-12": "videos/demo-10-Summery.webm",
+                "slide-13": "videos/demo-20-Entrance.webm",
+                "slide-14": "videos/demo-10-Summery.webm",
+                "slide-15": "videos/demo-20-Entrance.webm",
+                "slide-16": "videos/demo-10-Summery.webm",
+                "slide-17": "videos/demo-20-Entrance.webm",
+                "slide-18": "videos/demo-10-Summery.webm",
+                "slide-19": "videos/demo-20-Entrance.webm",
+                "slide-20": "videos/demo-10-Summery.webm"
             }
         }
     ]
