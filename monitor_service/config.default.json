@@ -2,5 +2,6 @@
     "websocket_port": 8765,
     "server_host": "localhost",
     "work_mode": "manual",
-    "avatar_status": "idle"
+    "avatar_command": "play",
+    "avatar_event": "idle"
 }

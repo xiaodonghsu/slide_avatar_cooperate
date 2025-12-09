@@ -30,8 +30,8 @@ contextBridge.exposeInMainWorld("pptWS", {
         // 默认重连配置
         const defaultOpts = {
             reconnect: true,
-            initialDelay: 1000, // 1s
-            maxDelay: 30000, // 30s
+            initialDelay: 500, // 1s
+            maxDelay: 2000, // 30s
             factor: 1.5 // 指数退避倍数
         };
 
@@ -66,7 +66,7 @@ contextBridge.exposeInMainWorld("pptWS", {
                     }
                 };
 
-                ws.onerror = (err) => console.log("WebSocket Error:", err);
+                ws.onerror = (err) => console.log("WebSocket Error:", JSON.stringify(err));
 
                 ws.onclose = (ev) => {
                     console.log("WebSocket -> Disconnected", ev && ev.code);

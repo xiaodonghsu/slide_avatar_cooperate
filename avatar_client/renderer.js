@@ -23,8 +23,8 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             if (window.pptWS && typeof window.pptWS.send === 'function') {
                 window.pptWS.send(event);
-                if (window.electronLog) window.electronLog.info('-> Monitor :', event);
-                else console.log("-> Monitor :", event);
+                if (window.electronLog) window.electronLog.info('-> Monitor:', JSON.stringify(event));
+                else console.log("-> Monitor:", JSON.stringify(event));
             } else {
                 if (window.electronLog) window.electronLog.warn('notifyMonitor: pptWS.send is not a available');
                 else console.warn('notifyMonitor: pptWS.send is not a available');
@@ -255,8 +255,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function parseControllerMessage(message) {
         try {
-            if (window.electronLog) window.electronLog.info('Received from Monitor:', message);
-            else console.log('Received from Monitor:', message);
+            if (window.electronLog) window.electronLog.info('Received from Monitor:',JSON.stringify(message));
+            else console.log('Received from Monitor:', JSON.stringify(message));
 
             // If it's already an object (e.g. json parsed by the WS layer), return it
             if (message && typeof message === 'object' && !((typeof Buffer !== 'undefined') && Buffer.isBuffer(message)) && !(message instanceof ArrayBuffer) && !(message instanceof Uint8Array)) {

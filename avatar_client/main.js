@@ -40,6 +40,7 @@ try {
     if (log && log.transports && log.transports.file && typeof log.transports.file.resolvePath === 'function') {
         log.transports.file.resolvePath = () => join(logDir, 'electron.log');
     }
+    log.info(logDir);
     const logPath = (log && log.transports && log.transports.file && typeof log.transports.file.getFile === 'function') ? (log.transports.file.getFile().path) : logDir;
     try { log.info('Logger initialized, writing to', logPath); } catch (_) { console.log('Logger initialized, writing to', logPath); }
 } catch (e) {
@@ -52,8 +53,8 @@ app.whenReady().then(() => {
     mainWindow = new BrowserWindow({
         width: 200,
         height: 360,
-        x: 1200, // 屏幕右侧
-        y: 500,
+        x: 1100, // 屏幕右侧
+        y: 380,
         frame: false,
         transparent: true,
         alwaysOnTop: true,
