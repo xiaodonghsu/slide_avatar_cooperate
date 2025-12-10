@@ -52,7 +52,7 @@ async def broadcast_slide_change():
     # 首次启动使用当前的配置作为基础配置
     logger.info("读取配置...")
     cfg = Config()
-    cfg.update()
+    cfg.fresh()
     previous_config = cfg.config.copy()
     logger.info("配置文件: %s", str(cfg.config))
     logger.info("初始化 Presentation 监控...")
@@ -90,8 +90,8 @@ async def broadcast_slide_change():
             # avatar_status 记录数字人播放器返回的状态事件
             # work_mode 从 auto 或 collaboration 切换到 manual, 需要发送停止播放的消息
             # 优先处理事件,减少事件问题导致状态的变化
-            cfg.update()
-            if cfg.isUpdated:
+            cfg.fresh()
+            if cfg.isFresh:
                 if previous_config["avatar_event"] != cfg.config["avatar_event"]:
                     logger.info("数字人事件: %s", cfg.config["avatar_event"])
                     # 根据工作模式处理事件
@@ -106,7 +106,7 @@ async def broadcast_slide_change():
                         pass
 
                 # 处理 work_mode 变化
-                if previous_config["work_mode"] != cfg.config["work_mode"]:
+                if cfg.config["work_mode_response"]["result"] != "success":
                     logger.info("Switching to %s mode.", cfg.config["work_mode"])
                     message = json.dumps({
                         "tasks": "text",
@@ -122,6 +122,7 @@ async def broadcast_slide_change():
                             "playlist": []
                         })
                         await handler.send_to_clients(message)
+                        cfg.update_work_mode_response()
                     elif cfg.config["work_mode"] == "collaboration":
                         # 协作模式下, 数字人站在旁边，通过数字人按钮决定播放
                         message = json.dumps({
@@ -132,7 +133,7 @@ async def broadcast_slide_change():
                         })
                         await handler.send_to_clients(message)
                         # 协作模式: 如果当前数字人状态为 playing, 则不做处理
-                        
+                        cfg.update_work_mode_response()
                         pass
                         # TODO:
                     elif cfg.config["work_mode"] == "auto":
@@ -143,9 +144,9 @@ async def broadcast_slide_change():
                             # 切换页面
                             slide_monitor.goto_next_page()
                         # TODO:
-
+                        cfg.update_work_mode_response()
                 # 处理 avatar_command 变化
-                if previous_config["avatar_command"] != cfg.config["avatar_command"]:
+                if cfg.config["avatar_command_response"]["result"] != "success":
                     # 处理数字人指令
                     # 如果当前数字人是播放状态, 则发送暂停指令
                     if avatar_status == "playing":
@@ -177,6 +178,7 @@ async def broadcast_slide_change():
                                 ]
                             })
                             await handler.send_to_clients(message)
+                    cfg.update_avatar_command_response()
                     # logger.info("发送任务")
                     # message = json.dumps({
                     #         "tasks": cfg.config["avatar_command"]
@@ -196,16 +198,14 @@ async def broadcast_slide_change():
             current_show_slide_index = slide_monitor.get_show_slide_index()
             current_edit_slide_index = slide_monitor.get_edit_slide_index()
             if current_present_name != "" and current_present_name != previous_present_name:
-                logger.info("检测到PPT发生变化,重新加载视频配置")
-                slide_monitor.update_slide_video_list(current_present_name)
+                logger.info("检测到当前 演示文件 发生变化,重新加载视频配置")
+                # slide_monitor.update_slide_video_list(current_present_name)
                 slide_changed = True
-                current_show_slide_index = slide_monitor.get_show_slide_index()
                 if current_show_slide_index > 0:
                     slide_page = current_show_slide_index
                 else:
                     slide_page = current_edit_slide_index
             else:
-                
                 if current_show_slide_index > 0:
                     if current_show_slide_index != previous_show_slide_index:
                         slide_changed = True
@@ -247,7 +247,7 @@ def update_avatar_event(event):
         return
     j["avatar_event"] = event
     with open("config.json", "w", encoding="utf-8") as f:
-        json.dump(j, f)
+        json.dump(j, f, ensure_ascii=False, indent=4)
 
 # 管理所有连接的客户端
 class handler:

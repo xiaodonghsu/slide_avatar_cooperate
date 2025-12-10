@@ -3,17 +3,29 @@ import os
 import json
 
 class SlideMonitor():
-    def __init__(self, assets_base_dir = "assets"):
+    def __init__(self, assets_base_dir = None):
         self.__slide_app_list = ["PowerPoint.Application", "Kwpp.Application"]
         self.__slide_app = None
         self.slide_app_name = None
         # 启动方式 "start_new" "use_existing"
         self.slide_app_startup_method = None
         self.slide_show_active = False
-        self.__assets_base_dir = assets_base_dir
+        self.__assets_base_path_file = "assets_base_path.txt"
         self.__slide_video_config = "slide_video.json"
         self.__slide_index_prefix = "slide-"
         self.__idle_video_prefix = "idle"
+        if assets_base_dir is None:
+            current_path = os.path.split(os.path.abspath(__file__))[0]
+            try:
+                with open(os.path.join(current_path, self.__assets_base_path_file), "r") as f:
+                    assets_base_dir = f.read().strip()
+            except Exception as e:
+                raise Exception("资源文件不存在:", e)
+        if not assets_base_dir is None:
+            assets_base_dir = os.path.abspath(assets_base_dir)
+            if not os.path.isdir(assets_base_dir):
+                raise Exception("资源路径不是有效路径:", assets_base_dir)
+        self.__assets_base_dir = assets_base_dir
         # 前一个状态记录
         self.previous_presentation_name = None
         self.previous_edit_slide_index = None
@@ -213,7 +225,7 @@ class SlideMonitor():
     def get_video_file(self, file_index):
         video_kv_list = self.get_slide_video_list()
         if not file_index in video_kv_list:
-            return None
+            return []
         return video_kv_list[file_index]
 
     def get_slide_app(self):
