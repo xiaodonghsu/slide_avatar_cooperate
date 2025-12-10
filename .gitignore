@@ -9,3 +9,4 @@ avatar_client/node_modules/
 avatar_client/dist/
 log/
 config.json
+__pycache__/
