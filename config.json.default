@@ -1,9 +1,0 @@
-{
-    "websocket_port": 8765,
-    "server_host": "localhost",
-    "work_mode": "manual",
-    "work_mode_response": {"result": "success", "reason": "success reason"},
-    "avatar_command": "play",
-    "avatar_command_response": {"result": "error", "reason": "error reason"},
-    "avatar_event": {"event": "started"}
-}

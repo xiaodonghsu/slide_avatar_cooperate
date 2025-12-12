@@ -9,7 +9,7 @@ class Config():
         websocket_port: WebSocket 服务器监听端口
         '''
         self.__CONFIG_FILE = "config.json"
-        self.__DEFAULT_CONFIG_FILE = "config.json.default"
+        self.__DEFAULT_CONFIG_FILE = "config.default.json"
         if not os.path.exists(self.__CONFIG_FILE):
             # 默认配置文件复制为config.json
             with open(self.__DEFAULT_CONFIG_FILE, 'rb') as f:

@@ -58,16 +58,22 @@ async def broadcast_slide_change():
     logger.info("初始化 Presentation 监控...")
     global slide_monitor
     slide_monitor = SlideMonitor()
-    slide_monitor.connect_slide_app()
-    presents_count = slide_monitor.get_presentations_count()
-    if presents_count < 0:
-        logger.warning("PPT应用没有打开")
-        message = json.dumps({
+    # slide_monitor.connect_slide_app()
+    # presents_count = slide_monitor.get_presentations_count()
+
+    # 启动应用
+    # slide_monitor.open_presentation()
+    
+    message = json.dumps({
             "tasks": "text",
-            "text": "PPT应用没有打开!",
-            "duration": 5
+            "text": f"启动场景{slide_monitor.get_active_scene_name()}",
+            "duration": 2
         })
-        await handler.send_to_clients(message)
+    await handler.send_to_clients(message)
+    
+    slide_monitor.start_slide_show()
+    
+    # 监测初始化状态
     previous_present_name = slide_monitor.get_presentation_name()
     previous_edit_slide_index = slide_monitor.get_edit_slide_index()
     previous_show_slide_index = slide_monitor.get_show_slide_index()
@@ -90,6 +96,19 @@ async def broadcast_slide_change():
             # avatar_status 记录数字人播放器返回的状态事件
             # work_mode 从 auto 或 collaboration 切换到 manual, 需要发送停止播放的消息
             # 优先处理事件,减少事件问题导致状态的变化
+            slide_monitor.fresh_scene()
+            if slide_monitor.scene_update_flag:
+                logger.info("检测到场景更新, 加载相关配置...")
+                message = json.dumps({
+                        "tasks": "text",
+                        "text": f"切换到场景{slide_monitor.get_active_scene_name()}",
+                        "duration": 2
+                    })
+                await handler.send_to_clients(message)
+                
+                # slide_monitor.open_presentation()
+                slide_monitor.start_slide_show()
+
             cfg.fresh()
             if cfg.isFresh:
                 if previous_config["avatar_event"] != cfg.config["avatar_event"]:
@@ -145,24 +164,61 @@ async def broadcast_slide_change():
                             slide_monitor.goto_next_page()
                         # TODO:
                         cfg.update_work_mode_response()
+
                 # 处理 avatar_command 变化
                 if cfg.config["avatar_command_response"]["result"] != "success":
+                    logger.info("Avatar command: %s mode.", cfg.config["avatar_command"])
                     # 处理数字人指令
                     # 如果当前数字人是播放状态, 则发送暂停指令
-                    if avatar_status == "playing":
-                        logger.info("发送暂停指令")
+                    if cfg.config["avatar_command"]["command"] == "play/pause":
+                        if avatar_status == "playing":
+                            logger.info("发送暂停指令")
+                            message = json.dumps({
+                                "tasks": "pause"
+                            })
+                            await handler.send_to_clients(message)
+                            avatar_status = "pause"
+                        elif avatar_status == "pause":
+                            logger.info("发送恢复指令")
+                            message = json.dumps({
+                                "tasks": "play"
+                            })
+                            await handler.send_to_clients(message)
+                            avatar_status = "playing"
+                        else:
+                            logger.info("数字人状态: %s, 播放当前页面", avatar_status)
+                            # 如果是其他状态,应该播放当前的页面
+                            slides_count = slide_monitor.get_slides_count()
+                            if slides_count > 0:
+                                slide_page = slide_monitor.get_show_slide_index()
+                                if slide_page == -1:
+                                    slide_page = slide_monitor.get_edit_slide_index()
+                                message = json.dumps({
+                                    "tasks": "playlist",
+                                    "playlist": [
+                                        {"video": slide_monitor.get_slide_video_file(slide_page), "loop": 1},
+                                        {"video": slide_monitor.get_idle_video_file(slide_page), "loop": -1}
+                                    ]
+                                })
+                                await handler.send_to_clients(message)
+                    elif cfg.config["avatar_command"]["command"] == "stop":
+                        # 停止命令，直接进入空闲视频状态
                         message = json.dumps({
-                            "tasks": "pause"
+                            "tasks": "playlist",
+                            "playlist": [
+                                {"video": slide_monitor.get_idle_video_file(slide_page), "loop": -1}
+                            ]
                         })
                         await handler.send_to_clients(message)
-                        avatar_status = "pause"
-                    elif avatar_status == "pause":
-                        logger.info("发送恢复指令")
+                        avatar_status = "idle"
+                    elif cfg.config["avatar_command"]["command"] == "text":
+                        # 发送文本消息
                         message = json.dumps({
-                            "tasks": "play"
+                            "tasks": "text",
+                            "text": cfg.config["avatar_command"]["text"],
+                            "duration": 5
                         })
                         await handler.send_to_clients(message)
-                        avatar_status = "playing"
                     else:
                         # 如果是其他状态,应该播放当前的页面
                         slides_count = slide_monitor.get_slides_count()
@@ -197,8 +253,9 @@ async def broadcast_slide_change():
             current_present_name = slide_monitor.get_presentation_name()
             current_show_slide_index = slide_monitor.get_show_slide_index()
             current_edit_slide_index = slide_monitor.get_edit_slide_index()
+            # logger.info("current - name: %s, show: %s, edit: %s", current_present_name, current_show_slide_index, current_edit_slide_index)
             if current_present_name != "" and current_present_name != previous_present_name:
-                logger.info("检测到当前 演示文件 发生变化,重新加载视频配置")
+                # logger.info("检测到当前 演示文件 发生变化")
                 # slide_monitor.update_slide_video_list(current_present_name)
                 slide_changed = True
                 if current_show_slide_index > 0:
@@ -212,14 +269,15 @@ async def broadcast_slide_change():
                         slide_page = current_show_slide_index
                 else:
                     # 有一种情况: 退出播放时, 播放页面为-1，但是编辑页面不变，此时不应为变化
-                    current_edit_slide_index = slide_monitor.get_edit_slide_index()
+                    if current_show_slide_index != previous_show_slide_index:
+                        logger.info("退出播放状态")
                     if current_edit_slide_index != previous_edit_slide_index:
                         slide_changed = True
                         slide_page = current_edit_slide_index
 
             # 如果发生变化
             if slide_changed:
-                logger.info("pptChanged: %s, %s, %s", current_present_name, current_show_slide_index, current_edit_slide_index)
+                logger.info("pptChanged - name: %s, show: %s, edit: %s", current_present_name, current_show_slide_index, current_edit_slide_index)
             
             # print(slide_page)
             # 如果是自动模式,播放当前页面

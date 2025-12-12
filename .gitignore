@@ -10,3 +10,4 @@ avatar_client/dist/
 log/
 config.json
 __pycache__/
+.comate/

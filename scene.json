@@ -1,0 +1,14 @@
+{
+    "assets_base": "../assets",
+    "scene_list": [
+        {
+            "name": "领导版-数据1",
+            "file": "1,1、(自动播放)数据板块模块-1.pptx"
+        },
+        {
+            "name": "员工版-数据2",
+            "file": "1,1、(自动播放)数据板块模块-2.pptx"
+        }
+    ],
+    "scene_active": "领导版-数据1"
+}

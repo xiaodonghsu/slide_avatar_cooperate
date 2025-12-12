@@ -1,26 +1,33 @@
 import win32com.client
 import os
 import json
+import time
 
 class SlideMonitor():
     def __init__(self, assets_base_dir = None):
+        # 胶片放映程序
         self.__slide_app_list = ["PowerPoint.Application", "Kwpp.Application"]
         self.__slide_app = None
         self.slide_app_name = None
+        # 场景加载管理: 周期性检查胶片配置是否更新, 及时加载胶片
+        # 为避免端侧频繁修改胶片的配置, 加载配置文件设置最小修改间隔
+        self.__scene_config_file = "scene.json"
+        self.__scene_config_last_modified_time = None
+        self.__previous_scene_config = None
+        self.__scene_config = None
+        self.scene_update_flag = False
+        self.__minimal_modify_interval = 5
+        self.__init_scene()
+        # 资源管理
         # 启动方式 "start_new" "use_existing"
         self.slide_app_startup_method = None
         self.slide_show_active = False
-        self.__assets_base_path_file = "assets_base_path.txt"
+        # self.__assets_base = self.load_assets()["assets_base"]
         self.__slide_video_config = "slide_video.json"
         self.__slide_index_prefix = "slide-"
         self.__idle_video_prefix = "idle"
         if assets_base_dir is None:
-            current_path = os.path.split(os.path.abspath(__file__))[0]
-            try:
-                with open(os.path.join(current_path, self.__assets_base_path_file), "r") as f:
-                    assets_base_dir = f.read().strip()
-            except Exception as e:
-                raise Exception("资源文件不存在:", e)
+            assets_base_dir = self.__scene_config["assets_base"]
         if not assets_base_dir is None:
             assets_base_dir = os.path.abspath(assets_base_dir)
             if not os.path.isdir(assets_base_dir):
@@ -37,6 +44,38 @@ class SlideMonitor():
         # 只让 ppt_add 没有连接的信息出现一次
         self.__ppt_app_warning_flag = True
 
+    def __init_scene(self):
+        if self.__scene_config is None:
+            with open(self.__scene_config_file, "r", encoding="utf-8") as f:
+                self.__scene_config = json.load(f)
+            self.__scene_config_last_modified_time = os.path.getmtime(self.__scene_config_file)
+        if self.__previous_scene_config is None:
+            self.__previous_scene_config = self.__scene_config.copy()
+
+    def fresh_scene(self):
+        self.scene_update_flag = False
+        scene_config_modified_time = os.path.getmtime(self.__scene_config_file)
+        if self.__scene_config_last_modified_time != scene_config_modified_time:
+            print("检测到 scene 配置修改:", time.time() - scene_config_modified_time, "秒")
+            if time.time() - scene_config_modified_time > self.__minimal_modify_interval:
+                with open(self.__scene_config_file, "r", encoding="utf-8") as f:
+                    self.__scene_config = json.load(f)
+                print(self.__previous_scene_config["scene_active"], "->", self.__scene_config["scene_active"])
+                if self.__scene_config["scene_active"] != self.__previous_scene_config["scene_active"]:
+                    self.scene_update_flag = True
+                print("更新文件修改时间及记忆配置")
+                self.__previous_scene_config = self.__scene_config.copy()
+                self.__scene_config_last_modified_time = scene_config_modified_time
+
+    def get_active_asset_file(self):
+        for asset in self.__scene_config["scene_list"]:
+            if asset["name"] == self.__scene_config["scene_active"]:
+                return os.path.join(os.path.split(os.path.abspath(__file__))[0], self.__scene_config["assets_base"], asset["file"])
+        return None
+
+    def get_active_scene_name(self):
+        return self.__scene_config["scene_active"]
+
     def connect_slide_app(self, open_app=False):
         for app_name in self.__slide_app_list:
             try:
@@ -49,16 +88,16 @@ class SlideMonitor():
                 self.slide_app = None
 
         if open_app and self.slide_app is None:
-            for app_name in self._ppt_app_list:
+            for app_name in self.__slide_app_list:
                 try:
-                    self.ppt_app = win32com.client.DispatchEx(app_name)
-                    self.ppt_app.DisplayAlerts = False
-                    if self.ppt_app:
-                        self.ppt_app_name = app_name
+                    self.slide_app = win32com.client.DispatchEx(app_name)
+                    self.slide_app.DisplayAlerts = False
+                    if self.slide_app:
+                        self.slide_app_name = app_name
                         self.slide_app_startup_method = "start_new"
                         break
                 except Exception as e:
-                    self.ppt_app = None
+                    self.slide_app = None
 
         if self.slide_app is None:
             if self.__ppt_app_warning_flag:
@@ -67,11 +106,12 @@ class SlideMonitor():
         else:
              self.__ppt_app_warning_flag = True
         
-        if not self.slide_app.Visible:
-            try:
+        try:
+            if not self.slide_app.Visible:
                 self.slide_app.Visible = 1
-            except Exception as e:
-                print(e)
+        except Exception as e:
+            self.slide_app = None
+            print("Error in set visible:", e)
 
     def get_presentation_name(self):
         '''
@@ -95,7 +135,10 @@ class SlideMonitor():
         '''
         slide_app = self.get_slide_app()
         if slide_app:
-            return slide_app.Presentations.Count
+            try:
+                return slide_app.Presentations.Count
+            except Exception as e:
+                pass
         return -1
 
     def get_slides_count(self):
@@ -115,8 +158,12 @@ class SlideMonitor():
         if slide_app:
             if slide_app.Presentations.Count > 0:
                 presentation = self.slide_app.ActivePresentation
-                slide = presentation.Windows(1).View.Slide
-                return slide.SlideIndex if slide.SlideIndex is not None else -1
+                if presentation:
+                    try:
+                        slide = presentation.Windows(1).View.Slide
+                        return slide.SlideIndex if slide.SlideIndex is not None else -1
+                    except:
+                        pass
         return -1
 
     def get_show_slide_index(self):
@@ -128,8 +175,12 @@ class SlideMonitor():
             if slide_app.Presentations.Count > 0:
                 if slide_app.SlideShowWindows.Count > 0:
                     presentation = self.slide_app.ActivePresentation
-                    slide = presentation.SlideShowWindow.View.Slide
-                    return slide.SlideIndex if slide.SlideIndex is not None else -1
+                    if presentation:
+                        try:
+                            slide = presentation.SlideShowWindow.View.Slide
+                            return slide.SlideIndex if slide.SlideIndex is not None else -1
+                        except:
+                            pass
         return -1
 
     def get_present_slide_index(self):
@@ -143,49 +194,6 @@ class SlideMonitor():
                 return slide.SlideIndex
             except:
                 return -1
-
-    # def get_current_ppt_status(self):
-    #     '''
-    #     获取当前幻灯片的播放状态和编号, 返回 
-    #     {"present_count": 打开的ppt数量,
-    #     "present_name": ppt名字,
-    #     "slides_count": 胶片数量,
-    #     "edit_slide_index": 当前编辑的胶片的索引,
-    #     "present_slide_index": 放映的胶片的索引}
-    #     编号为 -1 无效
-    #     '''
-    #     # 检查当前连接状态
-    #     current_ppt_status = {
-    #         "present_count": -1,
-    #         "present_name": "",
-    #         "slides_count": -1,
-    #         "edit_slide_index": -1,
-    #         "present_slide_index": -1
-    #     }
-    #     # 如果没有连接 PowerPoint，则尝试连接
-    #     if not self.isConnected():
-    #         self.connect_slide_app()
-    #     present_count = self.get_presentations_count()
-    #     # 根据当前连接状态返回结果
-    #     if present_count == -1:
-    #         return current_ppt_status
-    #     if present_count == 0:
-    #         current_ppt_status["present_count"] = present_count
-    #         return current_ppt_status
-    #     if present_count > 0:
-    #         current_ppt_status["present_count"] = present_count
-    #         presentation = self.slide_app.ActivePresentation
-    #         current_ppt_status["present_name"] = presentation.Name
-    #         current_ppt_status["slides_count"] = presentation.Slides.Count
-    #         current_ppt_status["edit_slide_index"] = presentation.Windows(1).View.Slide.SlideIndex
-    #         # 则获取当前幻灯片编号
-    #         present_slide_index = -1
-    #         try:
-    #             present_slide_index = presentation.SlideShowWindow.View.Slide.SlideIndex
-    #             current_ppt_status["present_slide_index"] = present_slide_index
-    #         except:
-    #             pass
-    #         return current_ppt_status
 
     def get_slide_video_list(self):
         '''
@@ -228,9 +236,9 @@ class SlideMonitor():
             return []
         return video_kv_list[file_index]
 
-    def get_slide_app(self):
+    def get_slide_app(self, open_app=False):
         if self.__slide_app is None:
-            self.connect_slide_app()
+            self.connect_slide_app(open_app)
         return self.slide_app
 
     def get_slide_show_index(self):
@@ -305,3 +313,70 @@ class SlideMonitor():
         self.current_presentation_name = self.get_presentation_name()
         self.current_slide_edit_index = self.get_slide_edit_index()
         self.current_slide_show_index = self.get_slide_show_index()
+
+    # 启动应用,加载加载胶片
+    def open_presentation(self):
+        slide_app = self.get_slide_app()
+        if slide_app is None:
+            slide_app = self.get_slide_app(open_app=True)
+        if slide_app is None:
+            return
+
+        active_presentation_file = self.get_active_asset_file()
+        print("需要放映的文档:", active_presentation_file)
+        if active_presentation_file is None:
+            print("尚未配置活跃演示文稿")
+            return
+
+        # 关闭所有的文档
+        for presentation in slide_app.Presentations:
+            presentation.Close()
+
+        # active_presentation_name = os.path.split(active_presentation_file)[-1]
+        # # 取得当前打开的文档名称的列表
+        # presentations_name = []
+        # for presentation in slide_app.Presentations:
+        #     presentations_name.append(presentation.Name)
+        # print("已打开的文档列表: ", presentations_name)
+        # print("活跃演示文稿: ", active_presentation_name)
+        # # 关闭与目标不一致的文档
+        # for item in presentations_name:
+        #     # 比较名称，不匹配则关闭
+        #     print("比较: ", item, active_presentation_name, item != active_presentation_name)
+        #     if item != active_presentation_name:
+        #         print("关闭文档:", item)
+        #         slide_app.Presentations[item].Close()
+        
+        print("尝试打开文档:", active_presentation_file)
+        try:
+            slide_app.Presentations.Open(active_presentation_file)
+        except Exception as e:
+            print("打开文档失败:", e)
+
+    def start_slide_show(self):
+        count_down = 120
+        while True:
+            print(count_down)
+            if self.get_slide_app(True) is None:
+                print("获取演示应用失败")
+                break
+            if self.get_presentations_count() < 0:
+                print("尚未检测到演示播放程序")
+            if self.get_presentations_count() >= 0:
+                print("检测到演示播放程序, 尝试加载文档")
+                self.open_presentation()
+                print("演示文档已加载")
+                if self.slide_app.SlideShowWindows.Count == 0:
+                    print("演示文档开始放映")
+                    self.slide_app.ActivePresentation.SlideShowSettings.Run()
+                print("等待演示文档放映")
+                time.sleep(3)
+                if self.slide_app.SlideShowWindows.Count > 0:
+                    print("已开始放映, 激活放映窗口")
+                    self.slide_app.ActivePresentation.SlideShowWindow.Activate()
+                    break
+            time.sleep(1)
+            count_down -= 1
+            if count_down == 0:
+                print("无PPT打开")
+                break
