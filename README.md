@@ -72,3 +72,10 @@ cd monitor_service && python monitor.py
 ```bash
 cd avatar_client && npm start
 ```
+## 编译成exe文件
+pyinstaller .\monitor.spec --workpath $env:TEMP --distpath "..\dist" --clean
+
+copy config.json ..\dist\monitor\config.json
+copy config.default.json ..\dist\monitor\config.default.json
+copy scene.json ..\dist\monitor\scene.json
+copy scene.default.json ..\dist\monitor\scene.default.json

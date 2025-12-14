@@ -365,6 +365,12 @@ class SlideMonitor():
             if self.get_presentations_count() >= 0:
                 print("检测到演示播放程序, 尝试加载文档")
                 self.open_presentation()
+                timer_after_open = time.time()
+                while self.get_presentations_count() == 0:
+                    time.sleep(1)
+                    if time.time() - timer_after_open > 3:
+                        print("等待演示文档加载超时")
+                        break
                 print("演示文档已加载")
                 if self.slide_app.SlideShowWindows.Count == 0:
                     print("演示文档开始放映")

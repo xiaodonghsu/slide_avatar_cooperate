@@ -11,3 +11,5 @@ log/
 config.json
 __pycache__/
 .comate/
+test_*
+/comate
