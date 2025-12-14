@@ -69,7 +69,7 @@ async def broadcast_slide_change():
             "text": f"启动场景{slide_monitor.get_active_scene_name()}",
             "duration": 2
         })
-    await handler.send_to_clients(message)
+    await handler.send_to_clients(message, "avatar")
     
     slide_monitor.start_slide_show()
     
@@ -104,7 +104,7 @@ async def broadcast_slide_change():
                         "text": f"切换到场景{slide_monitor.get_active_scene_name()}",
                         "duration": 2
                     })
-                await handler.send_to_clients(message)
+                await handler.send_to_clients(message, "avatar")
                 
                 # slide_monitor.open_presentation()
                 slide_monitor.start_slide_show()
@@ -132,7 +132,7 @@ async def broadcast_slide_change():
                         "text": cfg.config["work_mode"],
                         "duration": 2
                     })
-                    await handler.send_to_clients(message)
+                    await handler.send_to_clients(message, "avatar")
                     if cfg.config["work_mode"] == "manual":
                         # 讲解员模式: 主要的讲解任务在讲解员。数字人不参与
                         # 发送空的播放列表以停止播放
@@ -140,7 +140,7 @@ async def broadcast_slide_change():
                             "tasks": "playlist",
                             "playlist": []
                         })
-                        await handler.send_to_clients(message)
+                        await handler.send_to_clients(message, "avatar")
                         cfg.update_work_mode_response()
                     elif cfg.config["work_mode"] == "collaboration":
                         # 协作模式下, 数字人站在旁边，通过数字人按钮决定播放
@@ -150,7 +150,7 @@ async def broadcast_slide_change():
                                 {"video": slide_monitor.get_idle_video_file(slide_page), "loop": -1}
                             ]
                         })
-                        await handler.send_to_clients(message)
+                        await handler.send_to_clients(message, "avatar")
                         # 协作模式: 如果当前数字人状态为 playing, 则不做处理
                         cfg.update_work_mode_response()
                         pass
@@ -176,14 +176,14 @@ async def broadcast_slide_change():
                             message = json.dumps({
                                 "tasks": "pause"
                             })
-                            await handler.send_to_clients(message)
+                            await handler.send_to_clients(message, "avatar")
                             avatar_status = "pause"
                         elif avatar_status == "pause":
                             logger.info("发送恢复指令")
                             message = json.dumps({
                                 "tasks": "play"
                             })
-                            await handler.send_to_clients(message)
+                            await handler.send_to_clients(message, "avatar")
                             avatar_status = "playing"
                         else:
                             logger.info("数字人状态: %s, 播放当前页面", avatar_status)
@@ -200,7 +200,7 @@ async def broadcast_slide_change():
                                         {"video": slide_monitor.get_idle_video_file(slide_page), "loop": -1}
                                     ]
                                 })
-                                await handler.send_to_clients(message)
+                                await handler.send_to_clients(message, "avatar")
                     elif cfg.config["avatar_command"]["command"] == "stop":
                         # 停止命令，直接进入空闲视频状态
                         message = json.dumps({
@@ -209,7 +209,7 @@ async def broadcast_slide_change():
                                 {"video": slide_monitor.get_idle_video_file(slide_page), "loop": -1}
                             ]
                         })
-                        await handler.send_to_clients(message)
+                        await handler.send_to_clients(message, "avatar")
                         avatar_status = "idle"
                     elif cfg.config["avatar_command"]["command"] == "text":
                         # 发送文本消息
@@ -218,7 +218,7 @@ async def broadcast_slide_change():
                             "text": cfg.config["avatar_command"]["text"],
                             "duration": 5
                         })
-                        await handler.send_to_clients(message)
+                        await handler.send_to_clients(message, "avatar")
                     else:
                         # 如果是其他状态,应该播放当前的页面
                         slides_count = slide_monitor.get_slides_count()
@@ -233,7 +233,7 @@ async def broadcast_slide_change():
                                     {"video": slide_monitor.get_idle_video_file(slide_page), "loop": -1}
                                 ]
                             })
-                            await handler.send_to_clients(message)
+                            await handler.send_to_clients(message, "avatar")
                     cfg.update_avatar_command_response()
                     # logger.info("发送任务")
                     # message = json.dumps({
@@ -290,7 +290,7 @@ async def broadcast_slide_change():
                             {"video": slide_monitor.get_idle_video_file(slide_page), "loop": -1}
                         ]
                     })
-                    await handler.send_to_clients(message)
+                    await handler.send_to_clients(message, "avatar")
             await asyncio.sleep(0.5)
 
             # 更新参数
@@ -310,10 +310,13 @@ def update_avatar_event(event):
 # 管理所有连接的客户端
 class handler:
     clients = set()
+    client_types = {}  # 存储客户端类型信息 {websocket: client_type}
+    pending_identification = set()  # 等待识别类型的客户端
 
     @classmethod
     async def handler(cls, websocket, path=None):
         cls.clients.add(websocket)
+        cls.pending_identification.add(websocket)
         client_addr = None
         try:
             # 尝试获取客户端地址以便打印日志
@@ -322,40 +325,108 @@ class handler:
             except Exception:
                 client_addr = None
             logger.info("Client connected: %s", client_addr)
+            
+            # 发送类型识别问询消息
+            try:
+                inquiry_message = json.dumps({
+                    "tasks": "identify"
+                })
+                await websocket.send(inquiry_message)
+                logger.info("Sent type inquiry to client: %s", client_addr)
+            except Exception as e:
+                logger.exception("Error sending inquiry message: %s", e)
+            
             try:
                 async for message in websocket:
                     try:
                         logger.info("Received from %s: %s", client_addr, message)
                     except Exception as e:
                         logger.exception("Error printing received message: %s", e)
-                    # 尝试解析为 JSON 并打印解析后的内容
+                    # 尝试解析为 JSON 并处理
                     try:
                         parsed = json.loads(message)
-                        update_avatar_event(parsed)
-                        logger.info("Parsed message: %s", parsed)
-                    except Exception:
+                        
+                        # 如果客户端还未识别类型，检查是否是类型识别回复
+                        if websocket in cls.pending_identification:
+                            if parsed.get("tasks") == "identify_response" and "client_type" in parsed:
+                                client_type = parsed["client_type"]
+                                cls.client_types[websocket] = client_type
+                                cls.pending_identification.remove(websocket)
+                                logger.info("Client %s identified as type: %s", client_addr, client_type)
+
+                                continue
+                        
+                        # 正常的消息处理逻辑
+                        if websocket not in cls.pending_identification:
+                            update_avatar_event(parsed)
+                            logger.info("Parsed message: %s", parsed)
+                        else:
+                            logger.warning("Received message from unidentified client: %s", client_addr)
+                            
+                    except Exception as e:
                         logger.exception("Error parsing received message: %s", e)
             except websockets.exceptions.ConnectionClosed:
                 # 连接被客户端正常或异常关闭
                 logger.info("Client %s closed", client_addr)
                 pass
         finally:
-            cls.clients.remove(websocket)
+            # 清理客户端信息
+            cls.clients.discard(websocket)
+            cls.client_types.pop(websocket, None)
+            cls.pending_identification.discard(websocket)
             logger.info("Client disconnected: %s", client_addr)
     
     @classmethod
-    async def send_to_clients(cls, message):
-        logger.info("Broadcasting message to %s clients: %s", len(cls.clients), message)
+    async def send_to_clients(cls, message, client_type=None):
+        """
+        发送消息给客户端
+        
+        Args:
+            message: 要发送的消息
+            client_type: 可选，指定发送给特定类型的客户端。如果为None，发送给所有客户端
+        """
+        if client_type is None:
+            # 发送给所有已识别类型的客户端和未识别的客户端
+            target_clients = cls.clients - cls.pending_identification
+            logger.info("Broadcasting message to %s identified clients: %s", len(target_clients), message)
+        else:
+            # 发送给指定类型的客户端
+            target_clients = {ws for ws, ct in cls.client_types.items() if ct == client_type}
+            logger.info("Broadcasting message to %s clients of type '%s': %s", len(target_clients), client_type, message)
+        
+        if target_clients:
+            tasks = [asyncio.create_task(client.send(message)) for client in target_clients]
+            await asyncio.wait(tasks)
+        else:
+            if client_type is None:
+                logger.warning("No identified clients connected")
+            else:
+                logger.warning("No clients of type '%s' connected", client_type)
+    
+    @classmethod
+    async def send_to_all_clients(cls, message):
+        """
+        发送消息给所有客户端（包括未识别类型的客户端）
+        
+        Args:
+            message: 要发送的消息
+        """
+        logger.info("Broadcasting message to all %s clients: %s", len(cls.clients), message)
         if cls.clients:
-            # 原版
-            # await asyncio.wait([client.send(message) for client in cls.clients])
-            # 某些版本下会出现
-            # Passing coroutines coroutines is forbidden use tasks explicitly
-            # 的提示, 需要先转换为任务
             tasks = [asyncio.create_task(client.send(message)) for client in cls.clients]
             await asyncio.wait(tasks)
         else:
             logger.warning("No clients connected")
+    
+    @classmethod
+    def get_client_type_stats(cls):
+        """获取客户端类型统计信息"""
+        stats = {}
+        for client_type in cls.client_types.values():
+            stats[client_type] = stats.get(client_type, 0) + 1
+        stats['unidentified'] = len(cls.pending_identification)
+        stats['total'] = len(cls.clients)
+        return stats
 
 
 if __name__ == "__main__":
