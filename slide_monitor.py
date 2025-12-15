@@ -11,28 +11,18 @@ class SlideMonitor():
         self.slide_app_name = None
         # 场景加载管理: 周期性检查胶片配置是否更新, 及时加载胶片
         # 为避免端侧频繁修改胶片的配置, 加载配置文件设置最小修改间隔
-        self.__scene_config_file = "scene.json"
-        self.__scene_config_last_modified_time = None
-        self.__previous_scene_config = None
-        self.__scene_config = None
-        self.scene_update_flag = False
-        self.__minimal_modify_interval = 5
-        self.__init_scene()
+        # self.__scene_config_file = "scene.json"
+        # self.__scene_config_last_modified_time = None
+        # self.__previous_scene_config = None
+        # self.__scene_config = None
+        # self.scene_update_flag = False
+        # self.__minimal_modify_interval = 5
+        # self.__init_scene()
         # 资源管理
         # 启动方式 "start_new" "use_existing"
         self.slide_app_startup_method = None
         self.slide_show_active = False
-        # self.__assets_base = self.load_assets()["assets_base"]
-        self.__slide_video_config = "slide_video.json"
-        self.__slide_index_prefix = "slide-"
-        self.__idle_video_prefix = "idle"
-        if assets_base_dir is None:
-            assets_base_dir = self.__scene_config["assets_base"]
-        if not assets_base_dir is None:
-            assets_base_dir = os.path.abspath(assets_base_dir)
-            if not os.path.isdir(assets_base_dir):
-                raise Exception("资源路径不是有效路径:", assets_base_dir)
-        self.__assets_base_dir = assets_base_dir
+
         # 前一个状态记录
         self.previous_presentation_name = None
         self.previous_edit_slide_index = None
@@ -43,38 +33,6 @@ class SlideMonitor():
         self.current_show_slide_index = None
         # 只让 ppt_add 没有连接的信息出现一次
         self.__ppt_app_warning_flag = True
-
-    def __init_scene(self):
-        if self.__scene_config is None:
-            with open(self.__scene_config_file, "r", encoding="utf-8") as f:
-                self.__scene_config = json.load(f)
-            self.__scene_config_last_modified_time = os.path.getmtime(self.__scene_config_file)
-        if self.__previous_scene_config is None:
-            self.__previous_scene_config = self.__scene_config.copy()
-
-    def fresh_scene(self):
-        self.scene_update_flag = False
-        scene_config_modified_time = os.path.getmtime(self.__scene_config_file)
-        if self.__scene_config_last_modified_time != scene_config_modified_time:
-            print("检测到 scene 配置修改:", time.time() - scene_config_modified_time, "秒")
-            if time.time() - scene_config_modified_time > self.__minimal_modify_interval:
-                with open(self.__scene_config_file, "r", encoding="utf-8") as f:
-                    self.__scene_config = json.load(f)
-                print(self.__previous_scene_config["scene_active"], "->", self.__scene_config["scene_active"])
-                if self.__scene_config["scene_active"] != self.__previous_scene_config["scene_active"]:
-                    self.scene_update_flag = True
-                print("更新文件修改时间及记忆配置")
-                self.__previous_scene_config = self.__scene_config.copy()
-                self.__scene_config_last_modified_time = scene_config_modified_time
-
-    def get_active_asset_file(self):
-        for asset in self.__scene_config["scene_list"]:
-            if asset["name"] == self.__scene_config["scene_active"]:
-                return os.path.join(os.path.split(os.path.abspath(__file__))[0], self.__scene_config["assets_base"], asset["file"])
-        return None
-
-    def get_active_scene_name(self):
-        return self.__scene_config["scene_active"]
 
     def connect_slide_app(self, open_app=False):
         for app_name in self.__slide_app_list:
@@ -315,45 +273,29 @@ class SlideMonitor():
         self.current_slide_show_index = self.get_slide_show_index()
 
     # 启动应用,加载加载胶片
-    def open_presentation(self):
+    def open_presentation(self, presentation_file):
         slide_app = self.get_slide_app()
         if slide_app is None:
             slide_app = self.get_slide_app(open_app=True)
         if slide_app is None:
             return
 
-        active_presentation_file = self.get_active_asset_file()
-        print("需要放映的文档:", active_presentation_file)
-        if active_presentation_file is None:
-            print("尚未配置活跃演示文稿")
-            return
+        print("需要放映的文档:", presentation_file)
 
-        # 关闭所有的文档
+        # 检查文件是否已打开
+        isPrensentationOpened = False
         for presentation in slide_app.Presentations:
-            presentation.Close()
+            if presentation.FullName == presentation_file:
+                isPrensentationOpened = True
+                print("文档已打开:", presentation_file)
+        if isPrensentationOpened == False:
+            print("尝试打开文档:", presentation_file)
+            try:
+                slide_app.Presentations.Open(presentation_file)
+            except Exception as e:
+                print("打开文档失败:", e)
 
-        # active_presentation_name = os.path.split(active_presentation_file)[-1]
-        # # 取得当前打开的文档名称的列表
-        # presentations_name = []
-        # for presentation in slide_app.Presentations:
-        #     presentations_name.append(presentation.Name)
-        # print("已打开的文档列表: ", presentations_name)
-        # print("活跃演示文稿: ", active_presentation_name)
-        # # 关闭与目标不一致的文档
-        # for item in presentations_name:
-        #     # 比较名称，不匹配则关闭
-        #     print("比较: ", item, active_presentation_name, item != active_presentation_name)
-        #     if item != active_presentation_name:
-        #         print("关闭文档:", item)
-        #         slide_app.Presentations[item].Close()
-        
-        print("尝试打开文档:", active_presentation_file)
-        try:
-            slide_app.Presentations.Open(active_presentation_file)
-        except Exception as e:
-            print("打开文档失败:", e)
-
-    def start_slide_show(self):
+    def start_slide_show(self, presentation_file):
         count_down = 120
         while True:
             print(count_down)
@@ -364,7 +306,7 @@ class SlideMonitor():
                 print("尚未检测到演示播放程序")
             if self.get_presentations_count() >= 0:
                 print("检测到演示播放程序, 尝试加载文档")
-                self.open_presentation()
+                self.open_presentation(presentation_file)
                 timer_after_open = time.time()
                 while self.get_presentations_count() == 0:
                     time.sleep(1)

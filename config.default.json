@@ -15,5 +15,6 @@
     },
     "avatar_event": {
         "event": "started"
-    }
+    },
+    "active_scene": "员工版"
 }

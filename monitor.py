@@ -5,6 +5,7 @@ import os
 import websockets
 from config_monitor import Config
 from slide_monitor import SlideMonitor
+from asset_manager import AssetManager
 
 import logging
 from logging.handlers import RotatingFileHandler
@@ -48,7 +49,7 @@ def parse_event(event: dict) -> str:
     return "unknown"
 
 
-async def broadcast_slide_change():
+async def slide_monitor():
     # 首次启动使用当前的配置作为基础配置
     logger.info("读取配置...")
     cfg = Config()
@@ -58,20 +59,15 @@ async def broadcast_slide_change():
     logger.info("初始化 Presentation 监控...")
     global slide_monitor
     slide_monitor = SlideMonitor()
-    # slide_monitor.connect_slide_app()
-    # presents_count = slide_monitor.get_presentations_count()
+
+    asset_manager = AssetManager()
 
     # 启动应用
-    # slide_monitor.open_presentation()
-    
-    message = json.dumps({
-            "tasks": "text",
-            "text": f"启动场景{slide_monitor.get_active_scene_name()}",
-            "duration": 2
-        })
-    await handler.send_to_clients(message, "avatar")
-    
-    slide_monitor.start_slide_show()
+    presentation_file = asset_manager.get_slide_file(cfg.config["active_scene"])
+    if presentation_file is None:
+        logger.info("未找到对应的PPT文件 %s", presentation_file)
+    else:
+        slide_monitor.start_slide_show(presentation_file)
     
     # 监测初始化状态
     previous_present_name = slide_monitor.get_presentation_name()
@@ -96,20 +92,21 @@ async def broadcast_slide_change():
             # avatar_status 记录数字人播放器返回的状态事件
             # work_mode 从 auto 或 collaboration 切换到 manual, 需要发送停止播放的消息
             # 优先处理事件,减少事件问题导致状态的变化
-            slide_monitor.fresh_scene()
-            if slide_monitor.scene_update_flag:
-                logger.info("检测到场景更新, 加载相关配置...")
-                message = json.dumps({
-                        "tasks": "text",
-                        "text": f"切换到场景{slide_monitor.get_active_scene_name()}",
-                        "duration": 2
-                    })
-                await handler.send_to_clients(message, "avatar")
+            # slide_monitor.fresh_scene()
+            # if slide_monitor.scene_update_flag:
+            #     logger.info("检测到场景更新, 加载相关配置...")
+            #     message = json.dumps({
+            #             "tasks": "text",
+            #             "text": f"切换到场景{slide_monitor.get_active_scene_name()}",
+            #             "duration": 2
+            #         })
+            #     await handler.send_to_clients(message, "avatar")
                 
-                # slide_monitor.open_presentation()
-                slide_monitor.start_slide_show()
+            #     # slide_monitor.open_presentation()
+            #     slide_monitor.start_slide_show()
 
             cfg.fresh()
+            # print(cfg.config)
             if cfg.isFresh:
                 if previous_config["avatar_event"] != cfg.config["avatar_event"]:
                     logger.info("数字人事件: %s", cfg.config["avatar_event"])
@@ -328,13 +325,13 @@ class handler:
             
             # 发送类型识别问询消息
             try:
-                inquiry_message = json.dumps({
+                identify_message = json.dumps({
                     "tasks": "identify"
                 })
-                await websocket.send(inquiry_message)
-                logger.info("Sent type inquiry to client: %s", client_addr)
+                await websocket.send(identify_message)
+                logger.info("Sent type identify to client: %s", client_addr)
             except Exception as e:
-                logger.exception("Error sending inquiry message: %s", e)
+                logger.exception("Error sending identify message: %s", e)
             
             try:
                 async for message in websocket:
@@ -348,14 +345,13 @@ class handler:
                         
                         # 如果客户端还未识别类型，检查是否是类型识别回复
                         if websocket in cls.pending_identification:
-                            if parsed.get("tasks") == "identify_response" and "client_type" in parsed:
+                            if parsed.get("tasks") == "identify" and "client_type" in parsed:
                                 client_type = parsed["client_type"]
                                 cls.client_types[websocket] = client_type
                                 cls.pending_identification.remove(websocket)
                                 logger.info("Client %s identified as type: %s", client_addr, client_type)
 
                                 continue
-                        
                         # 正常的消息处理逻辑
                         if websocket not in cls.pending_identification:
                             update_avatar_event(parsed)
@@ -377,7 +373,7 @@ class handler:
             logger.info("Client disconnected: %s", client_addr)
     
     @classmethod
-    async def send_to_clients(cls, message, client_type=None):
+    async def send_to_clients(cls, message, client_type):
         """
         发送消息给客户端
         
@@ -437,4 +433,4 @@ if __name__ == "__main__":
         logger.error("Another instance of the program is already running.")
         exit(1)
     # 调用 npm start 方式启动数字人任务
-    asyncio.run(broadcast_slide_change())
+    asyncio.run(slide_monitor())
