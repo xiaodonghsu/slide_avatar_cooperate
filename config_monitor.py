@@ -8,16 +8,17 @@ class Config():
         server_host: WebSocket 服务器监听地址
         websocket_port: WebSocket 服务器监听端口
         '''
-        self.__DEFAULT_CONFIG_FILE = "config.default.json"
-        self.__CONFIG_FILE = "slide_monitor_config.json"
+        self.__DEFAULT_CONFIG_FILE = "running_config.default.json"
+        self.__CONFIG_FILE = "slide_monitor_running_config.json"
         temp_path = os.getenv('TEMP')
         self.config_file = os.path.join(temp_path, self.__CONFIG_FILE)
         if not os.path.exists(self.config_file):
             # 默认配置文件复制为config.json
-            with open(self.__DEFAULT_CONFIG_FILE, 'rb') as f:
-                data = f.read()
-            with open(self.config_file, 'wb') as f:
-                f.write(data)
+            with open(self.__DEFAULT_CONFIG_FILE, 'r', encoding="utf-8") as f:
+                data = json.load(f)
+            with open(self.config_file, 'w', encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=4)
+
         self.config = {}
         self.__last_load_time = None
         self.isFresh = False

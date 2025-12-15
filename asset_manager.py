@@ -1,3 +1,4 @@
+from ntpath import abspath
 import os
 import json
 from dotenv import load_dotenv
@@ -65,6 +66,28 @@ class AssetManager():
                         if os.path.exists(script_file):
                             return script_file
         return None
+
+    def get_slide_video_file(self, slide_name, slide_index=None):
+
+        '''
+
+        获取指定幻灯片的视频文件
+
+        '''
+        for sv in self.__slide_video_config["slide_videos"]:
+            if sv["name"] == slide_name:
+                file_index = None
+                if slide_index is None:
+                    file_index = self.__idle_video_prefix
+                else:
+                    file_index = self.__slide_index_prefix + str(slide_index)
+                if file_index in sv["videos"]:
+                    file_name = os.path.join(self.__assets_base_dir, sv["videos"][file_index])
+                    if os.path.exists(file_name):
+                        file_name = os.path.abspath(file_name)
+                        return file_name
+        return None
+
 
     def get_scenes(self):
         '''

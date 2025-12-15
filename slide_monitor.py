@@ -180,19 +180,19 @@ class SlideMonitor():
                             video_kv_list[video_index] = os.path.abspath(video_file)
                     return video_kv_list
 
-    def get_slide_video_file(self, slide_index):
-        index = self.__slide_index_prefix + str(slide_index)
-        return self.get_video_file(index)
+    # def get_slide_video_file(self, slide_index):
+    #     index = self.__slide_index_prefix + str(slide_index)
+    #     return self.get_video_file(index)
 
-    def get_idle_video_file(self, slide_index = None):
-        index = self.__idle_video_prefix
-        return self.get_video_file(index)
+    # def get_idle_video_file(self, slide_index = None):
+    #     index = self.__idle_video_prefix
+    #     return self.get_video_file(index)
 
-    def get_video_file(self, file_index):
-        video_kv_list = self.get_slide_video_list()
-        if not file_index in video_kv_list:
-            return []
-        return video_kv_list[file_index]
+    # def get_video_file(self, file_index):
+    #     video_kv_list = self.get_slide_video_list()
+    #     if not file_index in video_kv_list:
+    #         return []
+    #     return video_kv_list[file_index]
 
     def get_slide_app(self, open_app=False):
         if self.__slide_app is None:

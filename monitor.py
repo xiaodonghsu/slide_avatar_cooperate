@@ -144,7 +144,7 @@ async def slide_monitor():
                         message = json.dumps({
                             "tasks": "playlist",
                             "playlist": [
-                                {"video": slide_monitor.get_idle_video_file(slide_page), "loop": -1}
+                                {"video": asset_manager.get_slide_video_file(slide_monitor.get_presentation_name()), "loop": -1}
                             ]
                         })
                         await handler.send_to_clients(message, "avatar")
@@ -193,8 +193,8 @@ async def slide_monitor():
                                 message = json.dumps({
                                     "tasks": "playlist",
                                     "playlist": [
-                                        {"video": slide_monitor.get_slide_video_file(slide_page), "loop": 1},
-                                        {"video": slide_monitor.get_idle_video_file(slide_page), "loop": -1}
+                                        {"video": asset_manager.get_slide_video_file(slide_monitor.get_presentation_name(), slide_page), "loop": 1},
+                                        {"video": asset_manager.get_slide_video_file(slide_monitor.get_presentation_name()), "loop": -1}
                                     ]
                                 })
                                 await handler.send_to_clients(message, "avatar")

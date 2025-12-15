@@ -16,5 +16,9 @@
     "avatar_event": {
         "event": "started"
     },
-    "active_scene": "员工版"
+    "active_scene": "员工版",
+    "active_scene_response": {
+        "result": "error",
+        "reason": "error reason"
+    }
 }
